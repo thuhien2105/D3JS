@@ -1,0 +1,29 @@
+<!doctype htmml>
+<html lang = "en">
+<head>
+	<meta charset="UTF-8">
+	<title> DOM element </title>
+	<script src="https://d3js.org/d3.v4.min.js"></script> 
+	<style>
+		.text{
+			color:yellow;
+			text-align:center;
+		}
+	</style>
+</head>
+<body>
+	<p> first paragraph </p>
+	<p id="id1"> second paragraph </p>
+	<script> 
+		d3.select("p").text("Change text in paragraph 1")
+		d3.select("p").append("span")
+		d3.select("p").insert("p","span")
+		d3.select("p").remove()<!--xóa thẻ p đầu tiên-->
+		d3.select("p").html("Content of paragraph is change")<!--thay đổi text 
+		d3.select("p").attr("id","id2")<!--thêm attribute <p id="id2">aaaaaaaaaa</p>
+		d3.select("p").property("id","id3")<!--đổi nội dung thuộc tính đã tồn tại
+		d3.select("p").style("font-size","100px")<!--đổi style của element
+		d3.select("p").classed("text",1)<!--thêm class
+	</script>
+</body>
+</html>

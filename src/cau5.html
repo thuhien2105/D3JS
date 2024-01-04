@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bar Chart</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <style>
+        svg rect {
+            fill: steelblue;
+        }
+
+        svg text {
+            fill: black; /* Adjusted text color to black */
+            font: 10px sans-serif;
+            text-anchor: middle;
+        }
+
+        .axis-label {
+            fill: black; /* Adjusted text color to black */
+            font-size: 12px;
+            text-decoration: none; /* Ẩn gạch chân dưới trục x */
+        }
+
+        .chart-title {
+            fill: black; /* Adjusted text color to black */
+            font-size: 18px;
+            font-weight: bold;
+            text-anchor: middle;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chart-container"></div>
+    <p id="file-path">Current File: ./data/supermarket_sales.xls</p> <!-- Element to display the file path -->
+
+    <script>
+        // Declare filePathDisplay as a global variable
+        var filePathDisplay = document.getElementById("file-path");
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // Đường dẫn đến file Excel
+            var defaultFilePath = "./data/supermarket_sales.xls";
+            var fileInput = document.getElementById("file-input");
+
+            // Đọc dữ liệu từ file Excel
+            function readExcelFile(file) {
+                return new Promise((resolve, reject) => {
+                    var reader = new FileReader();
+                    reader.onload = function (e) {
+                        var data = new Uint8Array(e.target.result);
+                        var workbook = XLSX.read(data, { type: "array" });
+                        var sheetName = workbook.SheetNames[0]; // Chọn sheet đầu tiên
+                        var sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        resolve(sheet);
+                    };
+                    reader.onerror = function (err) {
+                        reject(err);
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            // Tải dữ liệu từ file Excel và vẽ biểu đồ
+            function loadAndDrawChart(file) {
+                // Display the current file path
+                filePathDisplay.innerText = "Current File: " + file.name;
+
+                readExcelFile(file).then(function (data) {
+                    // Chuyển đổi dữ liệu thành dạng thích hợp
+                    data.forEach(function (d) {
+                        d.Total = +d.Total; // Chuyển đổi Total sang kiểu số
+                    });
+
+                    // Nhóm dữ liệu theo giá trị trong cột "Branch" và tính tổng cho mỗi nhóm
+                    var branchData = Array.from(d3.group(data, d => d.Branch), ([key, value]) => ({
+                        key,
+                        value: d3.sum(value, d => d.Total)
+                    }));
+
+                    // Kích thước biểu đồ
+                    var margin = { top: 20, right: 30, bottom: 50, left: 60 };
+                    var width = 700 - margin.left - margin.right;
+                    var height = 700 - margin.top - margin.bottom;
+
+                    // Tạo scale cho trục x
+                    var xScale = d3.scaleBand()
+                        .domain(branchData.map(function (d) { return d.key; }))
+                        .range([0, width])
+                        .padding(0.1);
+
+                    // Tạo scale cho trục y
+                    var yScale = d3.scaleLinear()
+                        .domain([0, d3.max(branchData, function (d) { return d.value; })])
+                        .range([height, 0]);
+
+                    // Tạo container cho biểu đồ với margin
+                    var svg = d3.select("#chart-container")
+                        .html("")  // Clear previous content
+                        .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                    // Vẽ các cột trên biểu đồ
+                    svg.selectAll("rect")
+                        .data(branchData)
+                        .enter().append("rect")
+                        .attr("x", function (d) { return xScale(d.key); })
+                        .attr("y", function (d) { return yScale(d.value); })
+                        .attr("width", xScale.bandwidth())
+                        .attr("height", function (d) { return height - yScale(d.value); })
+                        .attr("fill", "steelblue");
+
+                    // Thêm giá trị lên các cột
+                    svg.selectAll("text.value")
+                        .data(branchData)
+                        .enter().append("text")
+                        .attr("class", "value")
+                        .attr("x", function (d) { return xScale(d.key) + xScale.bandwidth() / 2; })
+                        .attr("y", function (d) { return yScale(d.value) - 5; })
+                        .attr("text-anchor", "middle")
+                        .text(function (d) { return d.value; });
+
+                    // Thêm trục x
+                    svg.append("g")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(xScale))
+                    .selectAll("text")
+                    .attr("class", "axis-label")
+                    .attr("dy", "0.5em") // Điều chỉnh khoảng cách giữa nhãn và trục x
+                    .attr("transform", "rotate(-45)") // Xoay nhãn trục x
+                    .style("text-anchor", "end"); // Đặt giữa cuối nhãn và trục x
+
+
+                    // Thêm trục y
+                    svg.append("g")
+                        .call(d3.axisLeft(yScale))
+                        .selectAll("text")
+                        .attr("class", "axis-label");
+
+                    // Thêm nhãn cho trục x
+                    svg.append("text")
+                        .attr("class", "axis-label")
+                        .attr("x", width / 2)
+                        .attr("y", height + margin.top + 30)
+                        .text("Branch");
+
+                    // Thêm nhãn cho trục y
+                    svg.append("text")
+                        .attr("class", "axis-label")
+                        .attr("transform", "rotate(-90)")
+                        .attr("x", 40 - height / 2)
+                        .attr("y", 40 - margin.left)
+                        .text("Total Sales");
+
+                    // Thêm tiêu đề cho biểu đồ
+                    svg.append("text")
+                        .attr("class", "chart-title")
+                        .attr("x", width / 2)
+                        .attr("y", 10 - margin.top / 2)
+                        .text("Supermarket Sales by Branch");
+                }).catch(function (error) {
+                    console.error(error);
+                });
+            }
+
+            // Lắng nghe sự kiện khi có file được chọn
+            fileInput.addEventListener("change", function (event) {
+                var file = event.target.files[0];
+                if (file) {
+                    // Nếu có file, tải và vẽ biểu đồ
+                    loadAndDrawChart(file);
+                }
+            });
+
+
+        });
+    </script>
+
+    <!-- Thêm input để chọn file Excel -->
+    <input type="file" id="file-input" accept=".xls" />
+</body>
+
+</html>

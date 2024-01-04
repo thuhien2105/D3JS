@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pie Chart</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <style>
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chart-container"></div>
+    <p id="file-path">Current File: ./data/supermarket_sales.xls</p> <!-- Element to display the file path -->
+
+    <script>
+        // Declare filePathDisplay as a global variable
+        var filePathDisplay = document.getElementById("file-path");
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // Đường dẫn đến file Excel
+            var defaultFilePath = "./data/supermarket_sales.xls";
+            var fileInput = document.getElementById("file-input");
+
+            // Đọc dữ liệu từ file Excel
+            function readExcelFile(file) {
+                return new Promise((resolve, reject) => {
+                    var reader = new FileReader();
+                    reader.onload = function (e) {
+                        var data = new Uint8Array(e.target.result);
+                        var workbook = XLSX.read(data, { type: "array" });
+                        var sheetName = workbook.SheetNames[0]; // Chọn sheet đầu tiên
+                        var sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        resolve(sheet);
+                    };
+                    reader.onerror = function (err) {
+                        reject(err);
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            // Tải dữ liệu từ file Excel và vẽ biểu đồ Pie Chart
+            function loadAndDrawPieChart(file) {
+                // Display the current file path
+                filePathDisplay.innerText = "Current File: " + file.name;
+
+                readExcelFile(file).then(function (data) {
+                    // Chuyển đổi dữ liệu thành dạng thích hợp
+                    data.forEach(function (d) {
+                        d.Total = +d.Total; // Chuyển đổi Total sang kiểu số
+                    });
+
+                    // Nhóm dữ liệu theo giá trị trong cột "Member type" và tính tổng cho mỗi nhóm
+                    var memberTypeData = d3.group(data, d => d["Customer type"]);
+                    var pieData = Array.from(memberTypeData, ([key, value]) => ({
+                        memberType: key,
+                        total: d3.sum(value, d => d.Total)
+                    }));
+
+                    // Kích thước biểu đồ Pie Chart
+                    var width = 400;
+                    var height = 400;
+                    var radius = Math.min(width, height) / 2;
+
+                    // Màu sắc cho từng phần trong Pie Chart
+                    var color = d3.scaleOrdinal().domain(pieData.map(d => d.memberType))
+                        .range(d3.schemeCategory10); // You can customize colors here
+
+                    // Tạo biểu đồ Pie Chart
+                    var pieChart = d3.pie().value(function (d) { return d.total; });
+                    var arc = d3.arc().outerRadius(radius - 10).innerRadius(0);
+
+                    var svg = d3.select("#chart-container")
+                        .html("")  // Clear previous content
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height)
+                        .append("g")
+                        .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+                    // Vẽ các phần trong Pie Chart
+                    var arcs = svg.selectAll("arc")
+                        .data(pieChart(pieData))
+                        .enter()
+                        .append("g")
+                        .attr("class", "arc");
+
+                    arcs.append("path")
+                        .attr("d", arc)
+                        .attr("fill", function (d) { return color(d.data.memberType); }); // Set color based on memberType
+
+                    // Thêm nhãn cho từng phần
+                    arcs.append("text")
+                        .attr("transform", function (d) { return "translate(" + arc.centroid(d) + ")"; })
+                        .attr("dy", "0.35em")
+                        .text(function (d) { return d.data.memberType; });
+
+                }).catch(function (error) {
+                    console.error(error);
+                });
+            }
+
+            // Lắng nghe sự kiện khi có file được chọn
+            fileInput.addEventListener("change", function (event) {
+                var file = event.target.files[0];
+                if (file) {
+                    // Nếu có file, tải và vẽ biểu đồ Pie Chart
+                    loadAndDrawPieChart(file);
+                }
+            });
+
+        });
+    </script>
+
+    <!-- Thêm input để chọn file Excel -->
+    <input type="file" id="file-input" accept=".xls" />
+</body>
+
+</html>

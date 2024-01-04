@@ -1,0 +1,82 @@
+<!doctype htmml>
+<html lang = "en">
+<head>
+	<meta charset="UTF-8">
+	<title> DOM element </title>
+	<script src="https://d3js.org/d3.v4.min.js"></script> 
+	<style>
+		div{
+			height:100px;
+			width:100px;
+			background-color:steelblue;
+			margin:50px;
+		}
+	</style>
+	<script>
+
+	</script>
+</head>
+<body>
+	<p>D3 Tutorials</p>
+	<p> </p>
+	<p></p>
+	<p></p>
+	<script>
+		//biding 1 mảng
+	/*	var myData = [1, 2, 3];
+     
+         var p = d3.select("body") //chọn body
+                   .selectAll("p") // chọn tất cả p
+                   .data(myData) //binding
+                   .text(function (d, i) {
+                        return d;
+                    });*/
+    /*    var myData = ["Hello World!"];
+		
+		//binding 1 giá trị
+        var p = d3.select("body")
+            .selectAll("p")
+            .data(myData)
+            .text(function (d) {
+                return d;
+            });*/
+		
+		//enter()
+		var data = [4, 1, 6, 2, 8, 9];
+		var body = d3.select("body")
+                .selectAll("span")
+                .data(data)
+                .enter()
+                .append("span")
+				.style("color",function(d){
+					if (d%2 ==0) {
+						return "green";
+					}else{
+						return "red";
+					}
+				})
+                .text(function(d) { return d + " "; }); //function để nối chuỗi
+		
+		//exit()
+		var myData = ["Hello World123!"];
+
+		var p = d3.select("body")
+                .selectAll("p")
+                .data(myData)
+                .text(function (d, i) {
+                    return d;
+                })
+                .exit()
+                .remove();
+		//datum()
+		/* d3.select("body")
+           .select("p")
+           .datum(100)
+           .text(function (d, i) {
+				return d;
+        });
+*/
+		
+	</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
             "type": "msedge",
             "request": "launch",
             "name": "Open index.html",
-            "file": "d:\\FIT\\Study\\TQH\\TQHDL_10\\src\\index.html"
+            "file": "D:\\FIT\\Study\\D3JS\\src\\index.html"
         }
     ]
 }

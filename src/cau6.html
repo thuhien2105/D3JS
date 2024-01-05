@@ -3,125 +3,99 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Pie Chart</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
     <style>
-        .chart-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
+        /* Add any necessary CSS styles */
     </style>
 </head>
 
 <body>
-    <div id="chart-container"></div>
-    <p id="file-path">Current File: ./data/supermarket_sales.xls</p> <!-- Element to display the file path -->
 
-    <script>
-        // Declare filePathDisplay as a global variable
-        var filePathDisplay = document.getElementById("file-path");
+<!-- Choose an element to contain the pie chart -->
+<div id="pie-chart-container"></div>
 
-        document.addEventListener("DOMContentLoaded", function () {
-            // Đường dẫn đến file Excel
-            var defaultFilePath = "./data/supermarket_sales.xls";
-            var fileInput = document.getElementById("file-input");
+<script>
+    // Select container and set chart dimensions
+    var container = d3.select('#pie-chart-container');
+    var width = 500;
+    var height = 400;
+    var radius = Math.min(width, height) / 2;
 
-            // Đọc dữ liệu từ file Excel
-            function readExcelFile(file) {
-                return new Promise((resolve, reject) => {
-                    var reader = new FileReader();
-                    reader.onload = function (e) {
-                        var data = new Uint8Array(e.target.result);
-                        var workbook = XLSX.read(data, { type: "array" });
-                        var sheetName = workbook.SheetNames[0]; // Chọn sheet đầu tiên
-                        var sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                        resolve(sheet);
-                    };
-                    reader.onerror = function (err) {
-                        reject(err);
-                    };
-                    reader.readAsArrayBuffer(file);
-                });
-            }
+    // Set up SVG element and attributes
+    var svg = container.append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .append('g')
+        .attr('transform', 'translate(' + width / 2 + ',' + height / 2 + ')');
 
-            // Tải dữ liệu từ file Excel và vẽ biểu đồ Pie Chart
-            function loadAndDrawPieChart(file) {
-                // Display the current file path
-                filePathDisplay.innerText = "Current File: " + file.name;
+    // Read data from the Excel file
+    var excelFile = './data/supermarket_sales.xls';
+    var customerTypeColumn = 'Customer type';
+    var totalColumn = 'Total'; // Assuming a column named "Total" for the total data
 
-                readExcelFile(file).then(function (data) {
-                    // Chuyển đổi dữ liệu thành dạng thích hợp
-                    data.forEach(function (d) {
-                        d.Total = +d.Total; // Chuyển đổi Total sang kiểu số
-                    });
+    // Use SheetJS to read the data
+    var workbook;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', excelFile, true);
+    xhr.responseType = 'arraybuffer';
+    xhr.onload = function (e) {
+        var arraybuffer = xhr.response;
+        var data = new Uint8Array(arraybuffer);
+        workbook = XLSX.read(data, { type: 'array' });
 
-                    // Nhóm dữ liệu theo giá trị trong cột "Member type" và tính tổng cho mỗi nhóm
-                    var memberTypeData = d3.group(data, d => d["Customer type"]);
-                    var pieData = Array.from(memberTypeData, ([key, value]) => ({
-                        memberType: key,
-                        total: d3.sum(value, d => d.Total)
-                    }));
+        // Get data from the first sheet
+        var sheetName = workbook.SheetNames[0];
+        var sheet = workbook.Sheets[sheetName];
 
-                    // Kích thước biểu đồ Pie Chart
-                    var width = 400;
-                    var height = 400;
-                    var radius = Math.min(width, height) / 2;
+        // Convert data to JSON array
+        var jsonData = XLSX.utils.sheet_to_json(sheet);
 
-                    // Màu sắc cho từng phần trong Pie Chart
-                    var color = d3.scaleOrdinal().domain(pieData.map(d => d.memberType))
-                        .range(d3.schemeCategory10); // You can customize colors here
+        // Calculate the total sum for each customer type
+        var customerTypeData = d3.nest()
+            .key(d => d[customerTypeColumn])
+            .rollup(v => d3.sum(v, d => d[totalColumn]))
+            .entries(jsonData);
 
-                    // Tạo biểu đồ Pie Chart
-                    var pieChart = d3.pie().value(function (d) { return d.total; });
-                    var arc = d3.arc().outerRadius(radius - 10).innerRadius(0);
+        // Create a pie chart based on the total values
+        var pie = d3.pie().value(d => d.value);
+        var arc = d3.arc().outerRadius(radius - 30).innerRadius(0);
 
-                    var svg = d3.select("#chart-container")
-                        .html("")  // Clear previous content
-                        .append("svg")
-                        .attr("width", width)
-                        .attr("height", height)
-                        .append("g")
-                        .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+        var color = d3.scaleOrdinal(d3.schemeCategory10);
 
-                    // Vẽ các phần trong Pie Chart
-                    var arcs = svg.selectAll("arc")
-                        .data(pieChart(pieData))
-                        .enter()
-                        .append("g")
-                        .attr("class", "arc");
+        // Generate the pie chart
+        var pieChart = svg.selectAll('path')
+            .data(pie(customerTypeData))
+            .enter().append('path')
+            .attr('d', arc)
+            .attr('fill', (d, i) => color(i))
+            .attr('stroke', 'white') // Add white border for better visibility
+            .style('stroke-width', '2px'); // Set border width
 
-                    arcs.append("path")
-                        .attr("d", arc)
-                        .attr("fill", function (d) { return color(d.data.memberType); }); // Set color based on memberType
+        // Add labels and percentages to the pie chart
+        var label = d3.arc().outerRadius(radius).innerRadius(radius - 80);
+        svg.selectAll('text')
+            .data(pie(customerTypeData))
+            .enter().append('text')
+            .attr('transform', d => 'translate(' + label.centroid(d) + ')')
+            .attr('dy', '0.35em')
+            .text(d => `${d.data.key} (${(d.data.value / d3.sum(customerTypeData, d => d.value) * 100).toFixed(2)}%)`)
+            .style('text-anchor', 'middle')
+            .style('font-size', '12px'); // Set font size
 
-                    // Thêm nhãn cho từng phần
-                    arcs.append("text")
-                        .attr("transform", function (d) { return "translate(" + arc.centroid(d) + ")"; })
-                        .attr("dy", "0.35em")
-                        .text(function (d) { return d.data.memberType; });
+        // Add title to the pie chart
+        svg.append('text')
+            .attr('y', 190)
+            .attr('x', 20)
+            .attr('dy', '0em')
+            .style('text-anchor', 'middle')
+            .text('Hình 6. Biểu đồ tỷ lệ mua hàng của các loại khách hàng.');
+    };
 
-                }).catch(function (error) {
-                    console.error(error);
-                });
-            }
+    xhr.send();
+</script>
 
-            // Lắng nghe sự kiện khi có file được chọn
-            fileInput.addEventListener("change", function (event) {
-                var file = event.target.files[0];
-                if (file) {
-                    // Nếu có file, tải và vẽ biểu đồ Pie Chart
-                    loadAndDrawPieChart(file);
-                }
-            });
-
-        });
-    </script>
-
-    <!-- Thêm input để chọn file Excel -->
-    <input type="file" id="file-input" accept=".xls" />
 </body>
 
 </html>

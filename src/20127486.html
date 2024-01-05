@@ -116,6 +116,11 @@
             xScale.domain(topProducts.map(d => d.key));
             yScale.domain([0, d3.max(topProducts, d => d.value)]);
 
+            // Define a color scale based on luminance
+            var luminanceColorScale = d3.scaleLinear()
+                .domain([0, d3.max(topProducts, d => d.value)])
+                .range(["lightgray", "darkslategray"]);
+
             // Draw the bar chart
             svg.selectAll('rect')
                 .data(topProducts)
@@ -124,7 +129,8 @@
                 .attr('y', d => yScale(d.value))
                 .attr('width', xScale.bandwidth())
                 .attr('height', d => height - yScale(d.value))
-                .attr('fill', 'steelblue'); // Change 'steelblue' to the desired shade of blue
+                .attr('fill', d => luminanceColorScale(d.value)); // Use luminance-based color
+
 
             // Add x and y axes
             svg.append('g')

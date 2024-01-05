@@ -125,6 +125,7 @@
                 return d.value;
             }),
         ]);
+        var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
         // Draw the bars for the bar chart
         barSvg.selectAll('rect')
@@ -135,7 +136,7 @@
             .attr('y', (d) => barYScale(d.value))
             .attr('width', barXScale.bandwidth())
             .attr('height', (d) => barHeight - barYScale(d.value))
-            .attr('fill', '#4682b4'); // Bar color
+            .attr('fill', (d, i) => colorScale(i));
 
         // Add x and y axis for the bar chart
         barSvg.append('g')

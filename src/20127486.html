@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+    <style>
+        /* Bổ sung các kiểu CSS nếu cần thiết */
+        #bar-chart-container,
+        #pie-chart-container {
+            margin: auto;
+            width: 50%;
+            padding: 10px;
+        }
+
+        #pie-chart-container {
+            margin-left: 250px;
+            position: relative; /* Đặt vị trí của pie chart container */
+        }
+
+        .legend {
+            position: absolute; /* Đặt vị trí của legend */
+            top: 20px;
+            right: 20px;
+            font-size: 14px;
+            background-color: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Bar Chart Container -->
+<div>
+    Câu 7: Top 10 sản phẩm có gross income cao nhất.
+</div>
+<div id="bar1-chart-container"></div>
+
+<!-- Pie Chart Container -->
+<div>
+    Câu 8: Top 10 sản phẩm nào có số lượng bán nhiều nhất.
+</div>
+<div id="bar2-chart-container">
+</div>
+
+<script>
+    var container = d3.select('#bar1-chart-container');
+    var width = 500;
+    var height = 400;
+    var margin = { top: 30, right: 30, bottom:  70, left:  55 };
+
+    // Create scales for x and y axes
+    var xScale = d3.scaleBand().range([0, width]).padding(0.1);
+    var yScale = d3.scaleLinear().range([height, 0]);
+
+    // Set up SVG element and attributes
+    var svg = container.append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+    // Read data from the Excel file
+    var excelFile = './data/supermarket_sales.xls';
+    var productIDColumn = 'ProductID';
+    var grossIncomeColumn = 'gross income';
+
+    // Use SheetJS to read the data
+    var workbook;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', excelFile, true);
+    xhr.responseType = 'arraybuffer';
+    xhr.onload = function (e) {
+        try {
+            var arraybuffer = xhr.response;
+            var data = new Uint8Array(arraybuffer);
+            workbook = XLSX.read(data, { type: 'array' });
+
+            // Get data from the first sheet
+            var sheetName = workbook.SheetNames[0];
+            var sheet = workbook.Sheets[sheetName];
+
+            // Convert data to JSON array
+            var jsonData = XLSX.utils.sheet_to_json(sheet);
+
+            // Calculate gross income for each product
+            var productData = d3.nest()
+                .key(d => d[productIDColumn])
+                .rollup(v => d3.sum(v, d => d[grossIncomeColumn]))
+                .entries(jsonData);
+
+            // Sort products by gross income in descending order
+            productData.sort((a, b) => b.value - a.value);
+
+            // Take the top 10 products
+            var topProducts = productData.slice(0, 10);
+
+            // Set domains for x and y scales
+            xScale.domain(topProducts.map(d => d.key));
+            yScale.domain([0, d3.max(topProducts, d => d.value)]);
+
+            // Draw the bar chart
+            svg.selectAll('rect')
+                .data(topProducts)
+                .enter().append('rect')
+                .attr('x', d => xScale(d.key))
+                .attr('y', d => yScale(d.value))
+                .attr('width', xScale.bandwidth())
+                .attr('height', d => height - yScale(d.value))
+                .attr('fill', 'steelblue'); // Change 'steelblue' to the desired shade of blue
+
+            // Add x and y axes
+            svg.append('g')
+                .attr('transform', 'translate(0,' + height + ')')
+                .call(d3.axisBottom(xScale).tickSize(0).tickPadding(10))
+                .selectAll('text')
+                .style('text-anchor', 'end')
+                .attr('transform', 'rotate(-45)');
+
+            svg.append('g')
+                .call(d3.axisLeft(yScale));
+
+            // Add labels
+            svg.selectAll('text.label')
+                .data(topProducts)
+                .enter().append('text')
+                .attr('class', 'label')
+                .attr('x', d => xScale(d.key) + xScale.bandwidth() / 2)
+                .attr('y', d => yScale(d.value) - 5)
+                .attr('text-anchor', 'middle')
+                .text(d => d3.format('.2s')(d.value)); // Format the label as desired
+
+            // Add y-axis label
+            svg.append('text')
+                .attr('transform', 'rotate(-90)')
+                .attr('y', 0 - margin.left)
+                .attr('x', 0 - height / 2)
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text('Gross Income');
+
+            // Add x-axis title
+            svg.append('text')
+                .attr('y', height + margin.bottom - 40)
+                .attr('x', width / 2)
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text('Product IDs');
+
+            // Add title
+            svg.append('text')
+                .attr('y', 465)
+                .attr('x', width / 2)
+                .attr('dy', '0em')
+                .style('text-anchor', 'middle')
+                .text('Hình 7. Top 10 sản phẩm có gross income cao nhất.');
+        } catch (error) {
+            console.error('Error:', error.message);
+        }
+    };
+
+    xhr.send();
+
+    var barContainer = d3.select('#bar2-chart-container');
+    var barWidth = 500;
+    var barHeight = 400;
+    var barMargin = { top: 30, right: 30, bottom:  70, left:  55 };
+
+    // Create scales for x and y axes
+    var barXScale = d3.scaleBand().range([0, barWidth]).padding(0.1);
+    var barYScale = d3.scaleLinear().range([barHeight, 0]);
+
+    // Set up SVG element and attributes for the bar chart
+    var barSvg = barContainer.append('svg')
+        .attr('width', barWidth + barMargin.left + barMargin.right)
+        .attr('height', barHeight + barMargin.top + barMargin.bottom)
+        .append('g')
+        .attr('transform', 'translate(' + (barMargin.left ) + ',' + barMargin.top + ')');
+
+    // Read data from the Excel file
+    var barExcelFile = './data/supermarket_sales.xls';
+    var barProductIDColumn = 'ProductID';
+    var barQuantityColumn = 'Quantity';
+
+    // Use SheetJS to read the data
+    var barWorkbook;
+    var barXhr = new XMLHttpRequest();
+    barXhr.open('GET', barExcelFile, true);
+    barXhr.responseType = 'arraybuffer';
+    barXhr.onload = function (e) {
+        try {
+            var barArraybuffer = barXhr.response;
+            var barData = new Uint8Array(barArraybuffer);
+            barWorkbook = XLSX.read(barData, { type: 'array' });
+
+            // Get data from the first sheet
+            var barSheetName = barWorkbook.SheetNames[0];
+            var barSheet = barWorkbook.Sheets[barSheetName];
+
+            // Convert data to JSON array
+            var barJsonData = XLSX.utils.sheet_to_json(barSheet);
+
+            // Calculate total quantity sold for each product
+            var barProductData = d3.nest()
+                .key(d => d[barProductIDColumn])
+                .rollup(v => d3.sum(v, d => d[barQuantityColumn]))
+                .entries(barJsonData);
+
+            // Sort products by quantity sold in descending order
+            barProductData.sort((a, b) => b.value - a.value);
+
+            // Take the top 10 products
+            var barTopProducts = barProductData.slice(0, 10);
+
+            // Set domains for x and y scales
+            barXScale.domain(barTopProducts.map(d => d.key));
+            barYScale.domain([0, d3.max(barTopProducts, d => d.value)]);
+
+            // Define a color scale based on luminance
+            var luminanceColorScale = d3.scaleLinear()
+                .domain([0, d3.max(barTopProducts, d => d.value)])
+                .range(["lightgray", "darkslategray"]);
+
+            // Draw the bar chart with luminance-based colors
+            barSvg.selectAll('rect')
+                .data(barTopProducts)
+                .enter().append('rect')
+                .attr('x', d => barXScale(d.key))
+                .attr('y', d => barYScale(d.value))
+                .attr('width', barXScale.bandwidth())
+                .attr('height', d => barHeight - barYScale(d.value))
+                .attr('fill', d => luminanceColorScale(d.value)); // Use luminance-based color
+
+            // Add x and y axes
+            barSvg.append('g')
+                .attr('transform', 'translate(0,' + barHeight + ')')
+                .call(d3.axisBottom(barXScale).tickSize(0).tickPadding(10))
+                .selectAll('text')
+                .style('text-anchor', 'end')
+                .attr('transform', 'rotate(-45)');
+
+            barSvg.append('g')
+                .call(d3.axisLeft(barYScale));
+
+            // Add labels
+            barSvg.selectAll('text.label')
+                .data(barTopProducts)
+                .enter().append('text')
+                .attr('class', 'label')
+                .attr('x', d => barXScale(d.key) + barXScale.bandwidth() / 2)
+                .attr('y', d => barYScale(d.value) - 5)
+                .attr('text-anchor', 'middle')
+                .text(d => d3.format('.2s')(d.value)); // Format the label as desired
+
+            // Add y-axis label
+            barSvg.append('text')
+                .attr('transform', 'rotate(-90)')
+                .attr('y', 0 - barMargin.left)
+                .attr('x',  0- barHeight / 2)
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text('Quantity Sold');
+
+            // Add x-axis title
+            barSvg.append('text')
+                .attr('y', barHeight + barMargin.bottom -35)
+                .attr('x', barWidth / 2)
+                .attr('dy', '1em')
+                .style('text-anchor', 'middle')
+                .text('Product IDs');
+
+            // Add title
+            barSvg.append('text')
+                .attr('y', barHeight + barMargin.bottom)
+                .attr('x', barWidth / 2 -30)
+                .attr('dy', '0em')
+                .style('text-anchor', 'middle')
+                .text('Hình 8. Top 10 sản phẩm bán chạy nhất');
+        } catch (error) {
+            console.error('Error:', error.message);
+        }
+    };
+
+    barXhr.send();
+
+</script>
+
+</body>
+
+</html>

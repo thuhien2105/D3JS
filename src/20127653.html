@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+    <style>
+      /* Bổ sung các kiểu CSS nếu cần thiết */
+      #pie-chart-container {
+        margin: auto;
+        width: 50%;
+        padding: 10px;
+      }
+      #bar-chart-container {
+        margin-left: 250px;
+        width: 50%;
+        padding: 10px;
+      }
+      #legend-container {
+        margin-bottom: 5px;
+        border: 1px solid #ccc; /* Border style */
+        padding: 5px; /* Padding around legend items */
+        width: 12%;
+      }
+      .legend {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+      }
+
+      .legend-label {
+        font-size: 14px;
+      }
+      #pie-label {
+        width: 50%;
+        padding: 20px;
+        margin-left: 10px;
+        font-size: 20px; /* Increase font size for a title-like appearance */
+        font-weight: bold; /* Make the text bold */
+        text-align: center; /* Center the text */
+        color: #333; /* Set text color */
+        text-transform: uppercase; /* Convert text to uppercase */
+      }
+      #bar-label {
+        width: 50%;
+        padding: 20px;
+        margin-left: 145px;
+        font-size: 20px; /* Increase font size for a title-like appearance */
+        font-weight: bold; /* Make the text bold */
+        text-align: center; /* Center the text */
+        color: #333; /* Set text color */
+        text-transform: uppercase; /* Convert text to uppercase */
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      Câu 1: Số lượng lượt đánh giá đơn hàng có số điểm lớn hơn 5 của các chi
+      nhánh
+    </div>
+    <div id="bar-chart-container">
+      <div id="bar-label">
+        Số lượng đơn hàng có đánh giá lớn hơn 5 theo chi nhánh
+      </div>
+    </div>
+    <div>Câu 2: Tỷ lệ lợi nhuận gộp của các chi nhánh</div>
+    <div id="pie-chart-container">
+      <div id="pie-label">Thu nhập gộp theo chi nhánh</div>
+      <div id="legend-container"></div>
+    </div>
+
+    <script>
+      // Select container and set chart dimensions for the pie chart
+      var pieContainer = d3.select("#pie-chart-container");
+      var pieWidth = 400;
+      var pieHeight = 400;
+      var pieRadius = Math.min(pieWidth, pieHeight) / 2;
+
+      // Create SVG element for the pie chart
+      var pieSvg = pieContainer
+        .append("svg")
+        .attr("width", pieWidth)
+        .attr("height", pieHeight)
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + pieWidth / 2 + "," + pieHeight / 2 + ")"
+        );
+
+      // Select container and set chart dimensions for the bar chart
+      var barContainer = d3.select("#bar-chart-container");
+      var barWidth = 600;
+      var barHeight = 400;
+      var barMargin = { top: 30, right: 30, bottom: 70, left: 70 };
+
+      // Create SVG element for the bar chart
+      var barSvg = barContainer
+        .append("svg")
+        .attr("width", barWidth + barMargin.left + barMargin.right)
+        .attr("height", barHeight + barMargin.top + barMargin.bottom + 20)
+        .append("g")
+        .attr(
+          "transform",
+          "translate(" + barMargin.left + "," + barMargin.top + ")"
+        );
+
+      // Read data from Excel file
+      var excelFile = "./data/supermarket_sales.xls";
+
+      var workbook;
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", excelFile, true);
+      xhr.responseType = "arraybuffer";
+      xhr.onload = function (e) {
+        var arraybuffer = xhr.response;
+        var data = new Uint8Array(arraybuffer);
+        workbook = XLSX.read(data, { type: "array" });
+
+        // Get data from sheet 1
+        var sheetName = workbook.SheetNames[0];
+        var sheet = workbook.Sheets[sheetName];
+
+        // Convert data to JSON array
+        var jsonData = XLSX.utils.sheet_to_json(sheet);
+
+        // Calculate total gross income for the pie chart
+        var totalGrossIncomePie = d3.sum(jsonData, function (d) {
+          return +d["gross income"];
+        });
+
+        // Nest the data by branch for the pie chart
+        var nestedDataPie = d3
+          .nest()
+          .key(function (d) {
+            return d.Branch;
+          })
+          .rollup(function (leaves) {
+            return d3.sum(leaves, function (d) {
+              return +d["gross income"];
+            });
+          })
+          .entries(jsonData);
+        console.log(nestedDataPie);
+        // Create a color scale for the pie chart
+        var colorPie = d3
+          .scaleOrdinal()
+          .domain(
+            nestedDataPie.map(function (d) {
+              return d.key;
+            })
+          )
+          .range(d3.schemeCategory10);
+        var label = d3
+          .arc()
+          .outerRadius(0)
+          .innerRadius(pieRadius + 60);
+
+        // Create a pie chart layout
+        var piePie = d3.pie().value(function (d) {
+          return d.value;
+        });
+        // Generate the arcs for the pie chart
+        var arcsPie = pieSvg
+          .selectAll("arc")
+          .data(piePie(nestedDataPie))
+          .enter()
+          .append("g")
+          .attr("class", "arc");
+
+        // Draw the pie slices
+        arcsPie
+          .append("path")
+          .attr("d", d3.arc().innerRadius(0).outerRadius(pieRadius))
+          .attr("fill", function (d) {
+            return colorPie(d.data.key);
+          });
+
+        // Add labels for each slice
+        arcsPie
+          .append("text")
+          .attr("transform", function (d) {
+            return "translate(" + label.centroid(d) + ")";
+          })
+          .text(function (d) {
+            var percentagePie = (d.data.value / totalGrossIncomePie) * 100;
+            return percentagePie.toFixed(2) + "%";
+          });
+
+        // Nest the data by branch for the bar chart
+        var filteredData = jsonData.filter(function (d) {
+          return +d["Rating"] > 5;
+        });
+
+        // Nest the filtered data by branch for the bar chart
+        var nestedDataBar = d3
+          .nest()
+          .key(function (d) {
+            return d.Branch;
+          })
+          .rollup(function (leaves) {
+            return leaves.length; // Count the number of invoices
+          })
+          .entries(filteredData);
+
+        // Create a scale for the bar chart
+        var xScale = d3.scaleBand().range([0, barWidth]).padding(0.1);
+        var yScale = d3.scaleLinear().range([barHeight, 0]);
+
+        xScale.domain(
+          nestedDataBar.map(function (d) {
+            return d.key;
+          })
+        );
+
+        yScale.domain([
+          0,
+          d3.max(nestedDataBar, function (d) {
+            return d.value;
+          }),
+        ]);
+        var legendContainer = d3.select("#legend-container");
+
+        var legend = legendContainer
+          .selectAll("legend")
+          .data(nestedDataPie)
+          .enter()
+          .append("div")
+          .attr("class", "legend");
+
+        // Thêm màu và nhãn cho từng branch
+        legend
+          .append("div")
+          .attr("class", "legend-color")
+          .style("background-color", function (d) {
+            return colorPie(d.key);
+          });
+
+        legend
+          .append("div")
+          .attr("class", "legend-label")
+          .text(function (d) {
+            return "Chi nhánh " + d.key;
+          });
+        // Create a color scale for the bar chart
+        var colorBar = d3
+          .scaleOrdinal()
+          .domain(
+            nestedDataBar.map(function (d) {
+              return d.key;
+            })
+          )
+          .range(["#ff7f0e"]);
+
+        // Draw the bars for the bar chart
+        barSvg
+          .selectAll("rect")
+          .data(nestedDataBar)
+          .enter()
+          .append("rect")
+          .attr("x", (d) => xScale(d.key))
+          .attr("y", (d) => yScale(d.value))
+          .attr("width", xScale.bandwidth())
+          .attr("height", (d) => barHeight - yScale(d.value))
+          .attr("fill", (d) => colorBar(d.key));
+
+        // Add x and y axis for the bar chart
+        barSvg
+                .append("g")
+                .attr("transform", "translate(0," + (barHeight + 10) + ")")
+                .call(d3.axisBottom(xScale).tickSize(0).tickPadding(10)) // Set tickSize to 0 to remove ticks
+                .selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-0.8em")
+                .attr("dy", "0.15em")
+                .attr("transform", "rotate(0)");
+        barSvg.append("g").call(d3.axisLeft(yScale));
+
+        // Add labels for the bars
+        barSvg
+          .selectAll("text.label")
+          .data(nestedDataBar)
+          .enter()
+          .append("text")
+          .attr("class", "label")
+          .attr("x", (d) => xScale(d.key) + xScale.bandwidth() / 2)
+          .attr("y", (d) => yScale(d.value) - 5)
+          .attr("text-anchor", "middle")
+          .text((d) => d.value);
+
+        // Add y-axis label for the bar chart
+        barSvg
+          .append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", 0 - barMargin.left)
+          .attr("x", 0 - barHeight / 2)
+          .attr("dy", "1em")
+          .style("text-anchor", "middle")
+          .text("Số lượng đơn hàng có đánh giá lớn hơn 5");
+
+        // Add x-axis title for the bar chart
+        barSvg
+          .append("text")
+          .attr("y", barHeight + barMargin.bottom - 30)
+          .attr("x", barWidth / 2)
+          .attr("dy", "1em")
+          .style("text-anchor", "middle")
+          .text("Chi nhánh");
+      };
+
+      xhr.send();
+    </script>
+  </body>
+</html>

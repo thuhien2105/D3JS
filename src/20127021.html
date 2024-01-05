@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+    <style>
+        /* Bổ sung các kiểu CSS nếu cần thiết */
+        #bar-chart-container,
+        #pie-chart-container {
+            margin: auto;
+            width: 50%;
+            padding: 10px;
+        }
+
+        #pie-chart-container {
+            margin-left: 250px;
+            position: relative; /* Đặt vị trí của pie chart container */
+        }
+
+        .legend {
+            position: absolute; /* Đặt vị trí của legend */
+            top: 20px;
+            right: 20px;
+            font-size: 14px;
+            background-color: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Bar Chart Container -->
+<div>
+    Câu 5: Tổng doanh số bán hàng của từng chi nhánh là bao nhiêu?
+</div>
+<div id="bar-chart-container"></div>
+
+<!-- Pie Chart Container -->
+<div>
+    Câu 6: Tỉ lệ mua hàng của 2 loại khách hàng: Member & Normal?
+</div>
+<div id="pie-chart-container">
+    <div class="legend"></div>
+</div>
+
+<script>
+    // Bar Chart
+    var barContainer = d3.select('#bar-chart-container');
+    var barWidth = 500;
+    var barHeight = 400;
+    var barMargin = { top: 30, right: 30, bottom: 70, left: 70 };
+
+    // Create scales for x and y axes
+    var barXScale = d3.scaleBand().range([0, barWidth]).padding(0.1);
+    var barYScale = d3.scaleLinear().range([barHeight, 0]);
+
+    // Set up SVG element and attributes for the bar chart
+    var barSvg = barContainer.append('svg')
+        .attr('width', barWidth + barMargin.left + barMargin.right)
+        .attr('height', barHeight + barMargin.top + barMargin.bottom + 20)
+        .append('g')
+        .attr('transform', 'translate(' + barMargin.left + ',' + barMargin.top + ')');
+
+    // Read data from the Excel file for the bar chart
+    var barExcelFile = './data/supermarket_sales.xls';
+    var barBranchColumn = 'Branch';
+    var barTotalColumn = 'Total';
+
+    var barWorkbook;
+    var barXhr = new XMLHttpRequest();
+    barXhr.open('GET', barExcelFile, true);
+    barXhr.responseType = 'arraybuffer';
+    barXhr.onload = function (e) {
+        var arraybuffer = barXhr.response;
+        var data = new Uint8Array(arraybuffer);
+        barWorkbook = XLSX.read(data, { type: 'array' });
+
+        // Get data from the first sheet
+        var sheetName = barWorkbook.SheetNames[0];
+        var sheet = barWorkbook.Sheets[sheetName];
+
+        // Convert data to JSON array
+        var barJsonData = XLSX.utils.sheet_to_json(sheet);
+
+        // Nest the data by branch for the bar chart
+        var nestedDataBar = d3.nest()
+            .key(function (d) {
+                return d[barBranchColumn];
+            })
+            .rollup(function (leaves) {
+                return d3.sum(leaves, function (d) {
+                    return +d[barTotalColumn];
+                });
+            })
+            .entries(barJsonData);
+
+        // Create a scale for the bar chart
+        barXScale.domain(
+            nestedDataBar.map(function (d) {
+                return d.key;
+            })
+        );
+
+        barYScale.domain([
+            0,
+            d3.max(nestedDataBar, function (d) {
+                return d.value;
+            }),
+        ]);
+
+        // Draw the bars for the bar chart
+        barSvg.selectAll('rect')
+            .data(nestedDataBar)
+            .enter()
+            .append('rect')
+            .attr('x', (d) => barXScale(d.key))
+            .attr('y', (d) => barYScale(d.value))
+            .attr('width', barXScale.bandwidth())
+            .attr('height', (d) => barHeight - barYScale(d.value))
+            .attr('fill', '#4682b4'); // Bar color
+
+        // Add x and y axis for the bar chart
+        barSvg.append('g')
+            .attr('transform', 'translate(0,' + (barHeight ) + ')')
+            .call(d3.axisBottom(barXScale).tickSize(0).tickPadding(10))
+            .selectAll('text')
+            .attr('transform', 'rotate(0)')
+            .style('text-anchor', 'end')
+            .attr('dx', '-0.8em')
+            .attr('dy', '0.15em');
+
+        barSvg.append('g').call(d3.axisLeft(barYScale));
+
+        // Add labels for the bars
+        barSvg.selectAll('text.label')
+            .data(nestedDataBar)
+            .enter()
+            .append('text')
+            .attr('class', 'label')
+            .attr('x', (d) => barXScale(d.key) + barXScale.bandwidth() / 2)
+            .attr('y', (d) => barYScale(d.value) - 5)
+            .attr('text-anchor', 'middle')
+            .text((d) => d.value.toFixed(2));
+
+        // Add y-axis label for the bar chart
+        barSvg.append('text')
+            .attr('transform', 'rotate(-90)')
+            .attr('y', 0 - barMargin.left)
+            .attr('x', 0 - barHeight / 2)
+            .attr('dy', '1em')
+            .style('text-anchor', 'middle')
+            .text('Tổng doanh số bán hàng');
+
+        // Add x-axis title for the bar chart
+        barSvg.append('text')
+            .attr('y', barHeight + barMargin.bottom - 50)
+            .attr('x', barWidth / 2)
+            .attr('dy', '1em')
+            .style('text-anchor', 'middle')
+            .text('Chi nhánh');
+
+        barSvg.append('text')
+            .attr('y', 480)
+            .attr('x', 170)
+            .attr('dy', '0em')
+            .style('text-anchor', 'middle')
+            .text('Hình 5. Biểu đồ tổng doanh số của các chi nhánh.');
+    };
+
+    barXhr.send();
+
+    // Pie Chart
+    var pieContainer = d3.select('#pie-chart-container');
+    var pieWidth = 800;
+    var pieHeight = 400;
+    var pieRadius = Math.min(pieWidth, pieHeight) / 2;
+
+    // Set up SVG element and attributes
+    var pieSvg = pieContainer.append('svg')
+        .attr('width', pieWidth)
+        .attr('height', pieHeight)
+        .append('g')
+        .attr('transform', 'translate(' + (pieWidth / 2 +115) + ',' + pieHeight / 2 + ')');
+
+    // Read data from the Excel file
+    var excelFile = './data/supermarket_sales.xls';
+    var customerTypeColumn = 'Customer type';
+    var totalColumn = 'Total'; // Assuming a column named "Total" for the total data
+
+    var workbook;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', excelFile, true);
+    xhr.responseType = 'arraybuffer';
+    xhr.onload = function (e) {
+        var arraybuffer = xhr.response;
+        var data = new Uint8Array(arraybuffer);
+        workbook = XLSX.read(data, { type: 'array' });
+
+        // Get data from the first sheet
+        var sheetName = workbook.SheetNames[0];
+        var sheet = workbook.Sheets[sheetName];
+
+        // Convert data to JSON array
+        var pieJsonData = XLSX.utils.sheet_to_json(sheet);
+
+        // Calculate the total sum for each customer type
+        var customerTypeData = d3.nest()
+            .key(d => d[customerTypeColumn])
+            .rollup(v => d3.sum(v, d => d[totalColumn]))
+            .entries(pieJsonData);
+
+        // Create a pie chart based on the total values
+        var pie = d3.pie().value(d => d.value);
+        var arc = d3.arc().outerRadius(pieRadius - 30).innerRadius(0);
+
+        var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        // Generate the pie chart
+        var pieChart = pieSvg.selectAll('path')
+            .data(pie(customerTypeData))
+            .enter().append('path')
+            .attr('d', arc)
+            .attr('fill', (d, i) => color(i))
+            .attr('stroke', 'white') // Add white border for better visibility
+            .style('stroke-width', '2px') // Set border width
+
+
+        // Add labels and percentages to the pie chart
+        var label = d3.arc().outerRadius(pieRadius).innerRadius(pieRadius - 80);
+        pieSvg.selectAll('text')
+            .data(pie(customerTypeData))
+            .enter().append('text')
+            .attr('transform', d => 'translate(' + label.centroid(d) + ')')
+            .attr('dy', '0.35em')
+            .text(d => `${(d.data.value / d3.sum(customerTypeData, d => d.value) * 100).toFixed(2)}%`)
+            .style('text-anchor', 'middle')
+            .style('font-size', '15px');
+
+        // Add title to the pie chart
+        pieSvg.append('text')
+            .attr('y', 190)
+            .attr('x', -40)
+            .attr('dy', '0em')
+            .style('text-anchor', 'middle')
+            .text('Hình 6. Biểu đồ tỷ lệ mua hàng của các loại khách hàng.');
+
+        // Legend
+        var legend = pieContainer.select('.legend')
+            .selectAll(".legend-item")
+            .data(customerTypeData)
+            .enter()
+            .append("div")
+            .attr("class", "legend-item");
+
+        legend.append("div")
+            .attr("class", "legend-color")
+            .style("background-color", (d, i) => color(i));
+
+        legend.append("text")
+            .text(d => `${d.key}`)
+            .style("font-size", "14px");
+    };
+
+    xhr.send();
+
+
+</script>
+
+</body>
+
+</html>

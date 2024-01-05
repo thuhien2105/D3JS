@@ -78,3 +78,7 @@ body {
 }
 
 /* Add more styles as needed */
+
+.row-content {
+     line-height: 1.5; /* Điều chỉnh giữa dòng bằng cách thay đổi giá trị này */
+ }

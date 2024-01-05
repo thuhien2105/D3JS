@@ -75,8 +75,8 @@
         xScale.domain(paymentTypes);
         yScale.domain([0, d3.max(paymentCounts)]);
 
-        // Màu sắc duy nhất cho thanh bar
-        var barColor = '#ff7f0e';
+        // Màu sắc phân biệt cho thanh bar
+        var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
         // Vẽ biểu đồ cột (biểu đồ thanh toán)
         svgPayment.selectAll('rect')
@@ -86,7 +86,7 @@
             .attr('y', d => yScale(d.value))
             .attr('width', xScale.bandwidth())
             .attr('height', d => height - yScale(d.value))
-            .attr('fill', barColor);
+            .attr('fill', (d, i) => colorScale(i));
 
         // Thêm trục x và y (biểu đồ thanh toán)
         svgPayment.append('g')
@@ -159,8 +159,6 @@
         xScaleBranch.domain(branchNames);
         yScaleBranch.domain([0, d3.max(branchQuantities)]);
 
-        // Màu sắc duy nhất cho thanh bar
-        var branchBarColor = '#ff7f0e';
 
         // Vẽ biểu đồ cột (biểu đồ sản phẩm theo chi nhánh)
         svgBranch.selectAll('rect')
@@ -170,7 +168,7 @@
             .attr('y', d => yScaleBranch(d.value))
             .attr('width', xScaleBranch.bandwidth())
             .attr('height', d => height - yScaleBranch(d.value))
-            .attr('fill', branchBarColor);
+            .attr('fill', (d, i) => colorScale(i));
 
         // Thêm trục x và y (biểu đồ sản phẩm theo chi nhánh)
         svgBranch.append('g')
